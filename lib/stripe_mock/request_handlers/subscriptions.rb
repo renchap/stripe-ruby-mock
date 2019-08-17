@@ -108,7 +108,7 @@ module StripeMock
           end
         end
 
-        allowed_params = %w(customer application_fee_percent coupon items metadata plan quantity source tax_percent trial_end trial_period_days current_period_start created prorate billing_cycle_anchor billing days_until_due default_tax_rates idempotency_key)
+        allowed_params = %w(customer application_fee_percent coupon items metadata plan quantity source tax_percent trial_end trial_period_days current_period_start created prorate billing_cycle_anchor billing days_until_due default_tax_rates idempotency_key expand)
         unknown_params = params.keys - allowed_params.map(&:to_sym)
         if unknown_params.length > 0
           raise Stripe::InvalidRequestError.new("Received unknown parameter: #{unknown_params.join}", unknown_params.first.to_s, http_status: 400)
@@ -142,7 +142,15 @@ module StripeMock
         subscriptions[subscription[:id]] = subscription
         add_subscription_to_customer(customer, subscription)
 
-        subscriptions[subscription[:id]]
+        result = subscriptions[subscription[:id]]
+
+        if params[:expand] && params[:expand].include?("latest_invoice.payment_intent")
+          intent = Stripe::PaymentIntent.create(status: "succeeded", amount: subscription[:plan][:amount], currency: customer[:currency])
+          invoice = Stripe::Invoice.create(payment_intent: intent)
+          result.merge!(latest_invoice: invoice)
+        end
+
+        result
       end
 
       def retrieve_subscription(route, method_url, params, headers)
