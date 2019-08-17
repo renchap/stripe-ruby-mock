@@ -140,7 +140,15 @@ module StripeMock
         subscriptions[subscription[:id]] = subscription
         add_subscription_to_customer(customer, subscription)
 
-        subscriptions[subscription[:id]]
+        result = subscriptions[subscription[:id]]
+
+        if params[:expand] && params[:expand].include?("latest_invoice.payment_intent")
+          intent = Stripe::PaymentIntent.create(status: "succeeded", amount: subscription[:plan][:amount], currency: customer[:currency])
+          invoice = Stripe::Invoice.create(payment_intent: intent)
+          result.merge!(latest_invoice: invoice)
+        end
+
+        result
       end
 
       def retrieve_subscription(route, method_url, params, headers)
